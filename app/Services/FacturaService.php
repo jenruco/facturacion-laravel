@@ -8,9 +8,11 @@ use Illuminate\Support\Facades\Log;
 
 class FacturaService {
 
-    public function guardaFactura(array $data) {
+    public function guardaFactura(array $data): FacturaCab {
         Log::info($data);
         return DB::transaction(function () use ($data) {
+
+            $subtotalCab = 0;
 
             $factura = FacturaCab::create([
                 'numero_factura' => $data['numero_factura'],
@@ -26,37 +28,42 @@ class FacturaService {
                 'estado' => 'Activo'
             ]);
 
-            /*$factura = new FacturaCab();
-
-            $factura->numero_factura = $data['numero_factura'];
-            $factura->fecha_emision = $data['fecha_emision'];
-            $factura->cliente = $data['cliente'];
-            $factura->metodo_pago = $data['metodo_pago'];
-            $factura->usr_creacion = 'admin';
-            $factura->subtotal = 0;
-            $factura->iva = 0;
-            $factura->descuento = 0;
-            $factura->total = 0;
-            $factura->observacion = $data['observacion'];
-            $factura->estado = 'Activo';
-
-            $factura->save();*/
-
             foreach($data['productos'] as $producto) {
+
+                $subtotalDet = 0;
+                
+                if(!empty($producto['cantidad']) && !empty($producto['precio'])) {
+                    $subtotalDet = $producto['cantidad'] * $producto['precio'];
+
+                    $subtotalCab += $subtotalDet;
+                }
+
+                $ivaDet = 0.15 * $subtotalDet;
+                $totalDet = $subtotalDet + $ivaDet;
             
                 $factura->detalles()->create([
                     'producto' => $producto['producto'],
                     'descripcion' => $producto['producto'],
                     'cantidad' => $producto['cantidad'],
                     'precio_unitario' => $producto['precio'],
-                    'subtotal' => 0,
-                    'iva' => 15,
-                    'total' => 0,
+                    'subtotal' => $subtotalDet,
+                    'iva' => $ivaDet,
+                    'total' => $totalDet,
                     'estado' => 'Activo',
                     'usr_creacion' => 'admin'
                     
                 ]);
             }
+
+            $ivaCab = $subtotalCab * 0.15;
+            $totalCab = $subtotalCab + $ivaCab;
+
+            $factura->update([
+                'subtotal' => $subtotalCab,
+                'iva' => $ivaCab,
+                'total' => $totalCab,
+                'usr_ult_mod' => 'admin'
+            ]);
 
             return $factura;
         });
